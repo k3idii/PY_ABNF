@@ -10,7 +10,7 @@ multiline_spec : (statements comment_or_newline )+
 comment_or_newline : COMMENT | NEWLINE
 
 ?statements : primitive+ -> list_of_primitives 
-            | statements* ALT_OPER statements* -> alternative 
+            | statements+ ALT_OPER statements+ -> alternative 
             | statements* ( optional | group )? -> concat_statement
 
 optional       : OPT_BRA statements OPT_KET
@@ -24,38 +24,38 @@ primitive   : RULENAME
             | DEC_STRN
             | BIN_STRN
 
-RULENAME  : LETTER ("-"|LETTER|DIGIT)* 
+RULENAME   : LETTER ("-"|LETTER|DIGIT)* 
 
-REP_OPER    : (INT | "*" | ( INT "*" ) | ( "*" INT )| (INT "*" INT))
-REP_RULE    : REP_OPER RULENAME
-GRP_BRA     : REP_OPER? "("
-GRP_KET     : ")"
-OPT_BRA     : "["
-OPT_KET     : "]"
+REP_OPER   : (INT | "*" | ( INT "*" ) | ( "*" INT )| (INT "*" INT))
+REP_RULE   : REP_OPER RULENAME
+GRP_BRA    : REP_OPER? "("
+GRP_KET    : ")"
+OPT_BRA    : "["
+OPT_KET    : "]"
 
-HEX_STRN  : "%x" NHEX   ( ("-" NHEX)+   |   ("." NHEX)+ )?
-DEC_STRN  : "%d" NDEC   ( ("-" NDEC)+   |   ("." NDEC)+ )?
-BIN_STRN  : "%b" NBIN   ( ("-" NBIN)+   |   ("." NBIN)+ )?
+HEX_STRN   : "%x" NHEX   ( ("-" NHEX)+   |   ("." NHEX)+ )?
+DEC_STRN   : "%d" NDEC   ( ("-" NDEC)+   |   ("." NDEC)+ )?
+BIN_STRN   : "%b" NBIN   ( ("-" NBIN)+   |   ("." NBIN)+ )?
 
-NHEX      : HEXDIGIT+
-NDEC      : DIGIT+
-NBIN      : ("1"|"0")+
+NHEX       : HEXDIGIT+
+NDEC       : DIGIT+
+NBIN       : ("1"|"0")+
 
-ALT_OPER    : "/"
+ALT_OPER   : "/"
 
-DEF_OPER    : "=" 
-            | "=/"  
+DEF_OPER   : "=" 
+           | "=/"  
 
 BRAKET_STRING : /<[^<>]+>/
 
 COMMENT   : ";" /[^\n\r]/* NEWLINE 
  
-WS        : WS_INLINE
+//WS        : WS_INLINE
 //%import common.FLOAT
 //%import common.SIGNED_NUMBER
 
 %import common.INT
-%import common.CNAME
+//%import common.CNAME
 %import common.ESCAPED_STRING
 %import common.HEXDIGIT
 %import common.DIGIT
