@@ -16,13 +16,13 @@ comment_or_newline : COMMENT | NEWLINE
 optional       : OPT_BRA statements OPT_KET
 group          : GRP_BRA statements GRP_KET
 
-primitive   : RULENAME
-            | REP_RULE
-            | ESCAPED_STRING
-            | BRAKET_STRING
-            | HEX_STRN
-            | DEC_STRN
-            | BIN_STRN
+primitive   : RULENAME        -> ref_rule
+            | REP_RULE        -> rep_ref_rule
+            | ESCAPED_STRING  -> esc_string
+            | BRAKET_STRING   -> esc_string 
+            | HEX_STRN        -> num_string
+            | DEC_STRN        -> num_string
+            | BIN_STRN        -> num_string
 
 RULENAME   : LETTER ("-"|LETTER|DIGIT)* 
 
