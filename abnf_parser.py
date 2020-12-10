@@ -110,7 +110,8 @@ def _print_tree(tree):
 
 
 def _tokenize_abnf(abnf_data):
-  parser = lark.Lark(grammar=open("abnf_gramar.lark").read())
+  with open("abnf_gramar.lark") as grammar_file:
+    parser = lark.Lark(grammar=grammar_file.read())
   tree = parser.parse(abnf_data)
   return tree
 

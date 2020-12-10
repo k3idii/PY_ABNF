@@ -41,7 +41,7 @@ def main(args):
       print(binary)
   end = timer()
   time_diff = end - start
-  if cnt > 0:
+  if args.generate > 0:
     print(f"Generated {cnt} in {time_diff:.6f} seconds")
 
 

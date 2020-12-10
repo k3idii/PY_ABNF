@@ -281,9 +281,9 @@ class ABNF_Definition:
     self.arg = arg
 
   def generate(self):
+    self.ctx.depth = 0
     return self.arg.generate()
 
   def __repr__(self):
-    self.ctx.depth = 0
     return f"<DEF name='{self.name}'>{self.arg}</DEF>"
 
