@@ -87,7 +87,7 @@ if __name__ == '__main__':
     default = None
   )
   parser.add_argument(
-    '--mod', 
+    '--mod',
     metavar = 'module-name.py',
     help = "Use non-standard module for gerators (see alter.py example)",
     default = None,

@@ -46,25 +46,6 @@ class ABNFTransformer(lark.Transformer):
   def get_context(self):
     return self._ctx
 
-  def __unused__now_primitive(self, node):
-    node = node[0]
-    if node.type == 'RULENAME':
-      return self._mod.ABNF_Reference(self, node.value)
-    #elif node.type == 'HEX_STRN':
-    #  return self._mod.ABNF_NumString(self, node.value, 16)
-    #elif node.type == 'DEC_STRN':
-    #  return self._mod.ABNF_NumString(self, node.value, 10)
-    #elif node.type == 'BIN_STRN':
-    #  return self._mod.ABNF_NumString(self, node.value, 2)
-    elif node.type in ['BIN_STRN', 'DEC_STRN', 'HEX_STRN']:
-      return self._mod.ABNF_NumString(self, node.value)
-    elif node.type == 'ESCAPED_STRING':
-      return self._mod.ABNF_FixString(self, node.value)
-    elif node.type == 'REP_RULE':
-      return self._mod.ABNF_Repeat(self, node.value)
-    s = f"{node.type}({node.value})"
-    raise Exception(s)
-
   def esc_string(self, arg):
     return self._mod.ABNF_EscString(self._ctx, arg[0].value)
 

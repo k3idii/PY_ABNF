@@ -21,6 +21,11 @@ def _flip_the_coin():
 def _random_range(a,b):
   return a + int((b-a)/MADNESS_FACTOR)
 
+def fix_self(fn):
+  def _proxy(*self):
+    return fn()
+  return _proxy
+
 def extract_repeat_fmt(entry):
   """ exctact format and varname from repeat-var statement """
   expr = re.compile('(?P<fmt>[0-9*]+)(?P<varname>[A-Za-z][A-Za-z0-9-]*)')
@@ -57,8 +62,9 @@ def parse_repeate_string(fmt, rnd_func=None):
   return lambda *arg: rnd_func(repeat_a, repeat_b, *arg)
 
 def numeric_string_generator(arg):
-  """  Return function generating valid value.
-  Input := fmt : %XAA-BB.CC.DD ... ; dot-separated values   
+  """  Return function generating valid binary string.
+  Input := fmt : %XAA-BB.CC.DD ... ; dot-separated values
+  X = { d, b, x }
   """
   base = {'b':2,'d':10,'x':16}.get(arg[1])
   conv = lambda x: int(x, base)
@@ -66,12 +72,19 @@ def numeric_string_generator(arg):
     def _tmp(token):
       if '-' in token:
         args = list(map(conv,token.split('-')))
-        return lambda : random.randint(*args)
+        func = lambda : random.randint(*args)
+        #print("Single args:",args, func())
       else:
         val = conv(token)
-        return lambda : val
-    parts = map(_tmp, arg[2:].split("."))
-    return lambda : bytes(x() for x in parts)
+        func = lambda : val
+      return func
+    parts = list(map(_tmp, arg[2:].split(".")))
+    #def _gen():
+    #  v = list(x() for x in parts)
+    #  print("Generate", parts, v)
+    #  return bytes(v)
+    #return _gen
+    return lambda : bytes(list(x() for x in parts) )
   else:
     val = bytes([conv(arg[2:])])
     return lambda : val
@@ -94,6 +107,7 @@ class MyLazyResolver:
 
   def generate(self):
     """ Try to resolve symbol -> generate bytes  """
+    #print(f"RESOLVING {self.name}")
     val = self.ctx.get_rule(self.name, soft_fail=True)
     assert val is not None, f"FAIL TO RESOLVE lazy reference to : {self.name}"
     return val.generate()
@@ -105,30 +119,20 @@ class ABNF_Generator:
   """ Parent class for all sub-classes
   """
   format_str = '<???>'
-  def __init__(self, ctx, arg, *other):
+  def __init__(self, ctx, arg):
     self.ctx = ctx
     self.arg = arg
-    self.setup(*other)
+    self.setup()
     self.max_attempts = 10
 
   def can_go_deeper(self):
-    #print("DEPTH ?? : ",self.ctx._depth )
-    if self.ctx._depth > MAX_DEPTH:
+    if self.ctx.depth > MAX_DEPTH:
       return False
     return True
 
-  def setup(self, *_):
+  def setup(self):
+    """ ? """
     pass
-
-  def _resolve(self, varname, lazy=True):
-    val = self.ctx.get_rule(varname, soft_fail=True)
-    if val is None:
-      if lazy:
-        return MyLazyResolver(self.ctx, varname)
-      else:
-        return None
-    else:
-      return val
 
   def generate(self):
     """ Generate bytes value """
@@ -136,9 +140,9 @@ class ABNF_Generator:
     if not self.can_go_deeper():
       return b''
     for _i in range(self.max_attempts):
-      self.ctx._depth += 1
+      self.ctx.depth += 1
       chunk = self._gen()
-      self.ctx._depth -= 1
+      self.ctx.depth -= 1
       chunk = self.validate(chunk)
       if chunk is not None:
         #print("<<")
@@ -164,39 +168,36 @@ class ABNF_None(ABNF_Generator):
 
 
 class ABNF_AbstractRepeat(ABNF_Generator):
-  format_str = "<REPEAT range='{self.repeat_a} ... {self.repeat_b}'>{self.subject}</REPEAT>"
-  repeat_gen = None
+  format_str = "<REPEAT range='{self.fmt}'>{self.subject}</REPEAT>"
+  size_generator = fix_self(lambda :1) # callable, should return number of repetitions
   fmt = ''
   subject = None
 
-  def setup(self, *_):
-    self.fmt, self.subject = self._extract()
-    self.repeat_gen = parse_repeate_string(self.fmt)
-    #      ^--- callable that will return int
-
-  def _extract(self):
-    raise Exception("Implement extractor !")
+  def setup(self):
+    raise Exception("This is abstract class")
 
   def _gen(self):
-    #print("GENERATE", self.__class__, self.arg )
-    size = self.repeat_gen()
+    size = self.size_generator()
     return b''.join( self.subject.generate() for _ in range(size) )
 
 
 class ABNF_Repeatrule(ABNF_AbstractRepeat):  
-  def _extract(self):
-    fmt, varname = extract_repeat_fmt(self.arg)
-    return fmt, self._resolve(varname)
+  def setup(self):
+    self.fmt, self.varname = extract_repeat_fmt(self.arg)
+    self.size_generator = fix_self(parse_repeate_string(self.fmt))
+    self.subject = MyLazyResolver(self.ctx, self.varname)
 
 
 class ABNF_Group(ABNF_AbstractRepeat):
-  def _extract(self):
-    bra, child, _ket = self.arg
+  def setup(self):
+    bra, self.subject, _ket = self.arg
   #  ^-----------^----- Tokens !
-    fmt = '1' # default - repeat ONCE
     if len(bra.value) > 1:
-      fmt = bra.value[:-1]
-    return fmt, child
+      self.fmt = bra.value[:-1]
+      self.size_generator = fix_self(parse_repeate_string(self.fmt))
+    else:
+      self.fmt = "1"
+      #self.size_generator is already 1
 
 
 class ABNF_Primitive(ABNF_Generator):
@@ -206,9 +207,8 @@ class ABNF_Primitive(ABNF_Generator):
 
 class ABNF_EscString(ABNF_Primitive):
   name = "STRING"
-  def setup(self, *_):
+  def setup(self):
     self.arg = self.arg[1:-1] # STRIP QUOTES ("" or <>)
-    # ? self.arg = self.arg.strip('"')
 
   def _gen(self):
     return self.arg.encode()
@@ -218,7 +218,7 @@ class ABNF_NumString(ABNF_Primitive):
   name = "STRING-CODE"
   gen_fn = None
 
-  def setup(self, *_):
+  def setup(self):
     self.gen_fn = numeric_string_generator(self.arg)
 
   def _gen(self):
@@ -226,19 +226,13 @@ class ABNF_NumString(ABNF_Primitive):
 
 class ABNF_Reference(ABNF_Primitive):
   name = "REF"
-  #format_str = "<{self.name} to='{self.arg}'/>"
   resolve_repr = True
 
   def __repr__(self):
-    #if self.resolve_repr:
-    #  val = self._resolve(self.arg, lazy=False)
-    #  if val is not None:
-    #    return repr(val)
     return f"<{self.name} to='{self.arg}'/>"
 
   def _gen(self):
-    return self._resolve(self.arg).generate()
-    #return f"REF TO {self.arg}".encode()
+    return MyLazyResolver(self.ctx, self.arg).generate()
 
 
 class ABNF_List(ABNF_Generator):
@@ -252,21 +246,21 @@ class ABNF_List(ABNF_Generator):
 
 class ANBF_Optional(ABNF_Generator):
   format_str = "<OPTIONAL> {self.arg} </OPTIONAL>"
-  def setup(self, *_):
-    # arg = BRA ... VALUE ... KET 
+  def setup(self):
+    # arg = BRA ... VALUE ... KET
     #       ---------^
     self.arg = self.arg[1]
 
-  def _gen(self): 
+  def _gen(self):
     if _flip_the_coin() and self.can_go_deeper():
       return self.arg.generate()
-    else:
-      return b''
+    #else:
+    return b''
 
 class ABNF_Alternative(ABNF_Generator):
   format_str = "<ALT><OPT id=1>  {self.arg[0]} </OPT><!--OR {self.arg[1]} --><OPT id=2> {self.arg[2]} </OPT></ALT>"
 
-  def setup(self, *_):
+  def setup(self):
     # arg = OPT1 <alt-operator> OPT2
     self.options = [ self.arg[0] , self.arg[2] ]
 
@@ -285,11 +279,11 @@ class ABNF_Definition:
     self.ctx = ctx
     self.name = name
     self.arg = arg
-    
+
   def generate(self):
     return self.arg.generate()
 
   def __repr__(self):
-    self.ctx._depth = 0
+    self.ctx.depth = 0
     return f"<DEF name='{self.name}'>{self.arg}</DEF>"
 

@@ -13,8 +13,8 @@ comment_or_newline : COMMENT | NEWLINE
             | statements+ ALT_OPER statements+ -> alternative 
             | statements* ( optional | group )? -> concat_statement
 
-optional       : OPT_BRA statements OPT_KET
-group          : GRP_BRA statements GRP_KET
+optional    : OPT_BRA statements OPT_KET
+group       : GRP_BRA statements GRP_KET
 
 primitive   : RULENAME        -> ref_rule
             | REP_RULE        -> rep_ref_rule
